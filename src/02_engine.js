@@ -13,7 +13,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 function rng(seed){ let s = 0; for (const c of String(seed)) s = (s*31 + c.charCodeAt(0)) >>> 0; return () => { s = (s*1664525 + 1013904223) >>> 0; return s/4294967296; }; }
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const sum = a => a.reduce((x,y)=>x+y,0);
-function fmtN(n){ n = +n||0; if (n>=1e7) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M'; if (n>=1e6) return (n/1e6).toFixed(2).replace(/0$/,'')+'M'; if (n>=1e3) return (n/1e3).toFixed(n>=1e5?0:1).replace(/\.0$/,'')+'K'; return Math.round(n).toLocaleString('en-IN'); }
+function fmtN(n){ n = +n||0; if (n>=1e7) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M'; if (n>=1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M'; if (n>=1e3) return (n/1e3).toFixed(n>=1e5?0:1).replace(/\.0$/,'')+'K'; return Math.round(n).toLocaleString('en-IN'); }
 function fmtINR(n){ n = +n||0; const a=Math.abs(n); if (a>=1e7) return '₹'+(n/1e7).toFixed(2).replace(/\.?0+$/,'')+'Cr'; if (a>=1e5) return '₹'+(n/1e5).toFixed(2).replace(/\.?0+$/,'')+'L'; if (a>=1e3) return '₹'+(n/1e3).toFixed(1).replace(/\.0$/,'')+'K'; return '₹'+n.toFixed(n<100&&n%1?2:0); }
 const fmtINRx = n => '₹'+Math.round(n).toLocaleString('en-IN');
 const pct = (n,d=1) => (isFinite(n)? (n*100).toFixed(d):'0')+'%';
