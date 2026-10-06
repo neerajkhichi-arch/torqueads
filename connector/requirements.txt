@@ -1,0 +1,4 @@
+requests>=2.31
+google-ads>=27.0        # only needed for live Google Ads calls (campaign creation, reporting)
+google-auth>=2.29       # OAuth for the Data Manager API
+psycopg[binary]>=3.1    # production database (demo uses built-in sqlite3)

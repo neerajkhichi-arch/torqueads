@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local data and secrets — never commit
+*.db
+*.db-journal
+.env
+.env.*
+google-ads.yaml
+*credentials*.json
+service-account*.json
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
