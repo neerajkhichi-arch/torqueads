@@ -94,7 +94,8 @@ button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
 .shell{display:grid;grid-template-columns:96px 292px minmax(0,1fr);align-items:start}
 .shell.collapsed{grid-template-columns:96px minmax(0,1fr)}
 .shell.collapsed .subnav{display:none}
-.rail{display:flex;flex-direction:column;align-items:center;gap:14px;padding:12px 0 24px;position:sticky;top:calc(72px + env(safe-area-inset-top,0px));max-height:calc(100vh - 72px);overflow-y:auto}
+.rail{display:flex;flex-direction:column;align-items:center;gap:14px;padding:12px 0 24px;position:sticky;top:calc(72px + env(safe-area-inset-top,0px));max-height:calc(100vh - 72px);overflow:visible;z-index:15}
+.rail .pop{z-index:60}
 .fab{width:56px;height:56px;border-radius:50%;border:0;background:var(--surface);box-shadow:var(--shadow-2);display:grid;place-items:center;cursor:pointer;color:var(--accent);flex:none}
 .fab .msi{font-size:34px;font-variation-settings:"FILL" 0,"wght" 500,"GRAD" 0,"opsz" 48}
 .fab:hover{background:var(--accent-soft)}
@@ -333,6 +334,7 @@ pre.code{background:var(--sunk);border-radius:8px;padding:12px 14px;font-family:
   .scard{min-width:0;flex:1 1 100%}
   #sim-grid{grid-template-columns:1fr!important}
 }
+@media (max-width:900px){ .rail .pop.left{position:fixed;left:16px!important;right:16px;top:96px!important;width:auto} }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
