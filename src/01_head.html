@@ -302,6 +302,27 @@ pre.code{background:var(--sunk);border-radius:8px;padding:12px 14px;font-family:
 .pkg p{margin:0;font-size:13.5px;color:var(--ink-2)}
 .pkg .meta{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-2);border-top:1px solid var(--line);padding-top:10px;margin-top:auto;font-variant-numeric:tabular-nums}
 .menu-wrap{position:relative}
+
+/* decluttered top bar */
+.gbar{gap:4px;min-height:64px}
+.gbar .iconbtn{width:44px;height:44px}
+.gbar .iconbtn .badge{position:absolute;top:6px;right:6px;background:var(--bad);color:#fff;border-radius:99px;font-size:10px;font-weight:700;min-width:16px;height:16px;display:grid;place-items:center;padding:0 4px}
+.who{border-left:0;padding-left:6px;margin-left:2px}
+.avatar{border:0;cursor:pointer;width:36px;height:36px}
+.avatar:hover{box-shadow:0 0 0 4px var(--hover)}
+.acct-sel .a-top{display:none}
+.acct-sel{padding:4px 30px 4px 12px;margin-left:8px;border-left:1px solid var(--line);border-radius:0 6px 6px 0}
+.acct-sel .msi.dd{bottom:auto;top:50%;transform:translateY(-50%)}
+.banner{padding:6px 8px 6px 14px;gap:10px;margin:0 20px 10px;border-radius:8px}
+.banner>.msi{font-size:20px}
+.banner p{font-size:13.5px;min-width:200px}
+.banner .linkbtn{font-size:13.5px;padding:2px 6px}
+.banner .linkbtn:not([data-act$="dismiss"]){display:none}
+.banner .btn.fix{height:32px;padding:0 14px;font-size:13px}
+.pop .acct-h{display:flex;gap:12px;align-items:center;padding:8px 16px 12px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.pop .acct-h b{font-weight:500;display:block}
+.pop .acct-h small{color:var(--ink-2);font-size:12.5px}
+.pop .sample-note{font-size:12px;color:var(--ink-3);padding:8px 16px 4px;border-top:1px solid var(--line);margin-top:4px}
 @media (max-width:1200px){
   .shell{grid-template-columns:96px 240px minmax(0,1fr)}
   .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -334,6 +355,7 @@ pre.code{background:var(--sunk);border-radius:8px;padding:12px 14px;font-family:
   .scard{min-width:0;flex:1 1 100%}
   #sim-grid{grid-template-columns:1fr!important}
 }
+@media (max-width:900px){ .gbar .who{display:flex} .acct-sel{border-left:0;margin-left:0} }
 @media (max-width:900px){ .rail .pop.left{position:fixed;left:16px!important;right:16px;top:96px!important;width:auto} }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -346,12 +368,9 @@ pre.code{background:var(--sunk);border-radius:8px;padding:12px 14px;font-family:
   </div>
   <div class="acct-sel" id="acct"></div>
   <span class="sp"></span>
-  <span class="sample-flag" title="All figures in this prototype are generated sample data">Sample data</span>
-  <div class="menu-wrap"><button class="tool" data-act="pop" data-p="search" aria-label="Search pages"><span class="msi">search</span><span>Search</span></button><div id="pop-search"></div></div>
-  <button class="tool" data-act="refresh" aria-label="Refresh"><span class="msi">refresh</span><span>Refresh</span></button>
-  <div class="menu-wrap"><button class="tool" data-act="pop" data-p="notif" aria-label="Notifications"><span class="msi">notifications</span><span>Notifications</span><span class="badge" id="nbadge">3</span></button><div id="pop-notif"></div></div>
-  <div class="menu-wrap"><button class="tool" data-act="switch-console" aria-label="Switch console"><span class="msi">swap_horiz</span><span id="sw-lbl">Advertiser console</span></button><div id="pop-console"></div></div>
-  <div class="who"><div class="txt" id="who"></div><div class="avatar" id="avatar">AM</div></div>
+  <div class="menu-wrap"><button class="iconbtn" data-act="pop" data-p="search" aria-label="Search pages" title="Search pages"><span class="msi">search</span></button><div id="pop-search"></div></div>
+  <div class="menu-wrap"><button class="iconbtn" data-act="pop" data-p="notif" aria-label="Notifications" title="Notifications" style="position:relative"><span class="msi">notifications</span><span class="badge" id="nbadge">3</span></button><div id="pop-notif"></div></div>
+  <div class="menu-wrap who"><button class="avatar" id="avatar" data-act="switch-console" aria-label="Account and console switcher" title="Account · switch console">AM</button><div id="pop-console"></div><div id="who" hidden></div></div>
 </header>
 <div id="banner"></div>
 <div class="shell" id="shell">
