@@ -20,6 +20,7 @@ os.environ.setdefault("DATABASE_URL", f"sqlite:///{_DB}")
 
 import audience_sync
 import db
+import ga4_audiences
 import launcher
 import monitor
 from hashing import hash_email, hash_phone, hash_phone_meta
@@ -48,8 +49,16 @@ conn.executemany("INSERT INTO consent VALUES (?,?,?,?)", cons)
 conn.executemany("INSERT INTO cohort_membership VALUES (?,?,?)", members)
 conn.commit()
 
-print("\n② DAY 1 — nightly audience sync")
+print("\n② DAY 1 — nightly audience sync (Meta: hashed upload)")
 audience_sync.main(["--all"])
+
+print("\n②b Google: Torque keeps popular cohorts warm as GA4 audiences (no upload — the GA4 link shares them)")
+ga4_audiences.ensure(conn, "car.suv.10_20l.any.30d")
+ga4_audiences.ensure(conn, "car.ev.any.any.30d")
+print("   …an advertiser then picks a cohort nobody has used before → created on the spot:")
+ga4_audiences.ensure(conn, "car.suv.10_20l.price.30d")
+ga4_audiences.refresh(conn)
+ga4_audiences.status(conn)
 
 print("\n③ Advertiser launches 'Apex Terrain SUV' on YouTube + Meta")
 start = now.date().isoformat(); end = (now.date() + timedelta(days=29)).isoformat()

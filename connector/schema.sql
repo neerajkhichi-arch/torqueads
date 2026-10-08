@@ -89,3 +89,19 @@ CREATE TABLE IF NOT EXISTS line_item_stats (
   review_status  TEXT,
   PRIMARY KEY (line_item_id, stat_date)
 );
+
+-- ②b GA4 AUDIENCE REGISTRY: one GA4 audience per cohort per site, reused by every campaign that picks it
+CREATE TABLE IF NOT EXISTS ga4_audience (
+  cohort_key       TEXT NOT NULL,           -- e.g. car.suv.10_20l.price.30d
+  site             TEXT NOT NULL,           -- cardekho | bikedekho | zigwheels_car | zigwheels_bike
+  property_id      TEXT NOT NULL,
+  ga4_name         TEXT,                    -- properties/{p}/audiences/{id}
+  display_name     TEXT NOT NULL,           -- "Torque | <cohort_key>", how Google Ads finds the shared list
+  ads_user_list_id TEXT,                    -- filled once the GA4 link has shared it
+  size_display     INTEGER,                 -- Google's eligible size for YouTube/Display
+  status           TEXT NOT NULL,           -- creating | linking | filling | ready | archived | error
+  detail           TEXT,
+  created_at       TIMESTAMP NOT NULL,
+  last_used_at     TIMESTAMP,
+  PRIMARY KEY (cohort_key, site)
+);

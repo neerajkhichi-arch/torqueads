@@ -58,10 +58,27 @@ def user_list_size(user_list_id: str):
     return None
 
 
+def find_user_list(name: str):
+    """A GA4 audience shared through the GA4 link shows up here as a user list with the same name.
+    Returns (user_list_id, size_for_display) or (None, None) if it hasn't arrived yet."""
+    safe = name.replace("'", "")
+    q = ("SELECT user_list.id, user_list.size_for_display, user_list.type FROM user_list "
+         f"WHERE user_list.name = '{safe}'")
+    if DRY_RUN:
+        _dry("GoogleAdsService.search (find GA4-shared list)", {"query": q})
+        return str(next(_fake)), 48000          # pretend it's shared and filled
+    for r in _client().get_service("GoogleAdsService").search(customer_id=cid(), query=q):
+        return str(r.user_list.id), r.user_list.size_for_display
+    return None, None
+
+
 # ---------- ③ Demand Gen launch ----------
-def launch(li: dict, user_list_id: str, media_budget_inr: float) -> dict:
+def launch(li: dict, user_list_ids, media_budget_inr: float) -> dict:
     """Budget -> Demand Gen campaign (paused) -> ad group (YouTube channels, targets the list)
-    -> video asset -> Demand Gen video responsive ad."""
+    -> video asset -> Demand Gen video responsive ad.
+    user_list_ids: one list per site (e.g. CarDekho + ZigWheels GA4 audiences); the ad group targets all of them."""
+    if isinstance(user_list_ids, str):
+        user_list_ids = [user_list_ids]
     plan = {
         "campaign_budget": {"total_amount_micros": int(media_budget_inr * 1_000_000), "period": "CUSTOM",
                             "explicitly_shared": False},
@@ -71,7 +88,7 @@ def launch(li: dict, user_list_id: str, media_budget_inr: float) -> dict:
                      "start_date": li["start_date"], "end_date": li["end_date"]},
         "ad_group": {"name": f"{li['line_item_id']} | {li['cohort_id']}",
                      "demand_gen_ad_group_settings.channel_controls": "YouTube in-stream, in-feed, Shorts only",
-                     "audience": f"user list {user_list_id}  <-- the Torque cohort"},
+                     "audience": f"user lists {', '.join(user_list_ids)}  <-- the Torque cohort"},
         "asset": {"youtube_video_asset.youtube_video_id": li.get("youtube_video_id") or "VIDEO_ID"},
         "ad": {"demand_gen_video_responsive_ad": {
             "headlines": [li.get("headline")], "long_headlines": [li.get("headline")],
@@ -83,10 +100,10 @@ def launch(li: dict, user_list_id: str, media_budget_inr: float) -> dict:
         for k in ("campaign_budget", "campaign", "ad_group", "asset", "ad"):
             ids[k] = _dry(f"create {k}", plan[k])
         return ids
-    return _launch_live(li, user_list_id, plan)
+    return _launch_live(li, user_list_ids, plan)
 
 
-def _launch_live(li, user_list_id, plan):  # pragma: no cover - needs live credentials
+def _launch_live(li, user_list_ids, plan):  # pragma: no cover - needs live credentials
     client = _client()
     c = cid()
     ga = client.get_service("GoogleAdsService")
@@ -125,10 +142,11 @@ def _launch_live(li, user_list_id, plan):  # pragma: no cover - needs live crede
     cc.selected_channels.discover = False; cc.selected_channels.gmail = False; cc.selected_channels.display = False
     ops.append(op)
 
-    op = client.get_type("MutateOperation"); crit = op.ad_group_criterion_operation.create
-    crit.ad_group = ad_group_rn
-    crit.user_list.user_list = client.get_service("UserListService").user_list_path(c, user_list_id)
-    ops.append(op)   # TODO: Demand Gen may require an Audience resource instead; see Demand Gen audience docs
+    for ul in user_list_ids:   # TODO: Demand Gen may require an Audience resource instead; see Demand Gen audience docs
+        op = client.get_type("MutateOperation"); crit = op.ad_group_criterion_operation.create
+        crit.ad_group = ad_group_rn
+        crit.user_list.user_list = client.get_service("UserListService").user_list_path(c, ul)
+        ops.append(op)
 
     op = client.get_type("MutateOperation"); a = op.asset_operation.create
     a.resource_name = asset_rn; a.youtube_video_asset.youtube_video_id = li["youtube_video_id"]

@@ -11,10 +11,11 @@ import sys
 from datetime import datetime, timedelta
 
 import db
-from config import COHORT_LOOKBACK_DAYS, MIN_MATCHABLE_USERS
+from config import COHORT_LOOKBACK_DAYS, GOOGLE_AUDIENCE_SOURCE, MIN_MATCHABLE_USERS
 from destinations import google_ads, google_dm, meta
 
-PLATFORMS = ("google", "meta")
+# Google uses GA4 audiences by default (ga4_audiences.py); Customer Match upload is opt-in.
+PLATFORMS = ("google", "meta") if GOOGLE_AUDIENCE_SOURCE == "customer_match" else ("meta",)
 
 MEMBERS_SQL = """
 SELECT DISTINCT i.user_id, i.email_sha256, i.phone_sha256, i.phone_meta_sha256

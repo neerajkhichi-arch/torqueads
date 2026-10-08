@@ -11,9 +11,30 @@ This service connects the two halves: **our audience base** (cohorts built on Ca
 | Step | File | Platform APIs |
 |---|---|---|
 | ① Identity join | `schema.sql` (`identity`, `consent`, `cohort_membership`) | none, internal |
-| ② Audience sync | `audience_sync.py` | Google **Data Manager API** `audienceMembers:ingest` / `:remove` · Meta **Marketing API** `/{audience_id}/users` |
+| ②a Google audience | `ga4_audiences.py`, `cohorts.py`, `destinations/ga4.py` | **GA4 Admin API** (v1alpha) `properties.audiences.create`; the GA4 → Google Ads link shares it; **Google Ads API** finds the shared list |
+| ②b Meta audience | `audience_sync.py` | Meta **Marketing API** `/{audience_id}/users` (hashed, consented). Google Customer Match via the **Data Manager API** is optional: `GOOGLE_AUDIENCE_SOURCE=customer_match` |
 | ③ Launch | `launcher.py` | Google **Ads API**: Demand Gen campaign, ad group targeting the list, video ad · Meta **Marketing API**: campaign → ad set (`custom_audiences`) → creative → ad |
 | ④ Sync back | `monitor.py` | Google Ads API reporting · Meta Insights API |
+
+## Google: cohorts become GA4 audiences automatically
+
+CarDekho, BikeDekho and ZigWheels already send every visit to GA4 360, and GA4 is linked to Google Ads.
+So for YouTube, Torque doesn't upload anyone. When an advertiser picks a cohort:
+
+1. `ga4_audiences.ensure(cohort)` looks it up in the `ga4_audience` registry. If it's new, it builds the GA4
+   audience from the cohort's building blocks (`cohorts.py`) and creates it on each site's GA4 property.
+2. The GA4 → Google Ads link shares it to the Torque Google Ads account as a list named `Torque | <cohort>`.
+3. `ga4_audiences.py refresh` (hourly) finds the list in Google Ads and moves it
+   `linking → filling → ready` once it passes the YouTube minimum (~1,000 users).
+4. `launcher.py` targets the ready lists, one per site, in the YouTube ad group.
+
+Cohort keys are `vertical.category.price_band.intent.<days>d`, e.g. `car.suv.10_20l.price.30d`.
+Fixed building blocks mean identical picks reuse one GA4 audience. `prebuild` keeps popular cohorts warm,
+and `archive-stale` frees slots so a property never hits its audience cap.
+
+**Setup:** add the connector's service account to each GA4 property (Editor or Marketer), and set
+`GA4_PROP_ZIGWHEELS`. Price bands use model-page lists until a `price_bucket` event parameter is registered
+in GA4. Then set `GA4_PRICE_PARAM_<SITE>=price_bucket` and price matching becomes exact.
 
 ## Try it now (no credentials needed)
 
@@ -62,6 +83,8 @@ Every API call is printed, not sent (`DRY_RUN=1`).
 ## Known gaps before production
 
 * **YouTube video hosting:** the ad needs the video on YouTube first. Add an uploader (YouTube Data API) that puts advertiser videos on the Torque channel as *unlisted* and saves `youtube_video_id`.
+* **GA4 audience API is alpha:** `properties.audiences` lives in Admin API v1alpha. Pin the version and re-test when Google promotes it.
+* **GA4 audiences fill from creation:** a brand-new cohort can take 24–48 h to pass the YouTube minimum. The wizard should show "Building" until `refresh` marks it ready.
 * **Demand Gen audience targeting:** `destinations/google_ads.py` targets the list with an ad group user-list criterion. Demand Gen may require an `Audience` resource instead. Confirm against the current Google Ads API version (marked `TODO`).
 * **Match-rate readback:** `google_ads.user_list_size()` and `meta.audience_size()` exist, but nothing calls them yet. Schedule them to fill `matched_count`.
 * **Meta special ad categories:** loans and insurance advertisers may need `special_ad_categories`, which limits targeting. Set it per advertiser.

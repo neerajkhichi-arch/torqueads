@@ -32,3 +32,11 @@ GOOGLE_ADS_YAML = os.getenv("GOOGLE_ADS_YAML", "google-ads.yaml")  # developer t
 
 # Commercial
 MGMT_FEE = float(os.getenv("MGMT_FEE", "0.15"))   # Torque fee on top of platform media
+
+# --- GA4 (audiences built from on-site behaviour, shared to Google Ads via the GA4 link) ---
+GA4_ADMIN_ENDPOINT = "https://analyticsadmin.googleapis.com/v1alpha"
+GOOGLE_AUDIENCE_SOURCE = os.getenv("GOOGLE_AUDIENCE_SOURCE", "ga4")   # ga4 (default) | customer_match
+GA4_AUDIENCE_LIMIT = int(os.getenv("GA4_AUDIENCE_LIMIT", "400"))       # per property; GA4 360 allows more than standard
+GA4_AUDIENCE_HEADROOM = int(os.getenv("GA4_AUDIENCE_HEADROOM", "20"))  # leave room for the analytics team
+GA4_ARCHIVE_AFTER_DAYS = int(os.getenv("GA4_ARCHIVE_AFTER_DAYS", "60"))
+YOUTUBE_MIN_LIST_SIZE = int(os.getenv("YOUTUBE_MIN_LIST_SIZE", "1000"))  # Google won't serve smaller lists

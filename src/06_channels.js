@@ -11,6 +11,8 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 .chtag .msi{font-size:16px}
 .chcard{border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
 .chcard h3{margin:0;font-family:var(--display);font-size:15px;font-weight:500;display:flex;align-items:center;gap:8px}
+.ga4row{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:8px;background:var(--surface2, rgba(127,127,127,.08));margin-bottom:6px;font-size:13.5px}
+.ga4row .msi{font-size:20px;margin-top:1px}
 .flow{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .flow .st{flex:1 1 150px;padding:12px 14px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px;background:var(--surface)}
 .flow .st:last-child{border-right:0}
@@ -36,7 +38,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 /* ---------- channel catalogue ---------- */
 const CH = {
   owned:  {name:'Torque sites',      icon:'language',      desc:'CarDekho, BikeDekho and ZigWheels — our own pages, first-party cohorts, full control.', color:'var(--c1)'},
-  youtube:{name:'YouTube',           icon:'smart_display', desc:'Cohorts sent as hashed, consented IDs (Customer Match via Data Manager API). Runs as Demand Gen: in-stream, Shorts and feeds.', color:'var(--c2)'},
+  youtube:{name:'YouTube',           icon:'smart_display', desc:'Your cohort becomes a GA4 audience automatically and reaches YouTube through the GA4 360 → Google Ads link — nothing is uploaded. Runs as Demand Gen: in-stream, Shorts and feeds.', color:'var(--c2)'},
   meta:   {name:'Meta',              icon:'diversity_3',   desc:'Facebook and Instagram via Custom Audiences built from the same consented cohorts.', color:'var(--c3)'},
   network:{name:'Publisher network', icon:'hub',           desc:'Partner blogs and sites running the Torque tag, plus the open exchange via OpenRTB.', color:'var(--c4)'},
 };
@@ -46,6 +48,8 @@ const OFFSITE = {
   identifiable:.46,   // share with a hashed email / phone on file (logged-in, lead, app)
   idSync:.38,         // share recognised on partner sites via Torque ID sync
   match:{youtube:.52, meta:.61},
+  googleMatch:.72,    // share of consented GA4 visitors Google can recognise on YouTube (signed-in)
+  minList:{youtube:1000, meta:10000},   // Google won't serve lists under ~1,000; Torque rule for Meta uploads
   perUser:{youtube:7, meta:9, network:12},    // monthly ad opportunities per matched user
   media:{youtube:95, meta:125, network:70, exchange:48},  // ₹ CPM, sample
   dataFee:40,          // ₹ CPM Torque audience fee on off-site delivery
@@ -97,7 +101,8 @@ function effSplit(d){
 function chAudience(ch, d){
   const pool = cohortPool(d.audience);
   if (ch==='owned') return estimateAudience(d.audience, d.sites?.length? d.sites : ['cd','bd','zw']).users;
-  if (ch==='youtube'||ch==='meta') return pool * OFFSITE.consent * OFFSITE.identifiable * OFFSITE.match[ch];
+  if (ch==='youtube') return pool * OFFSITE.consent * OFFSITE.googleMatch;   // GA4 audience: every consented visitor, no login needed
+  if (ch==='meta') return pool * OFFSITE.consent * OFFSITE.identifiable * OFFSITE.match[ch];
   // network: cohort users recognised on partner sites + contextual auto-intent readers
   const cats = d.net?.cats?.length ? d.net.cats : NET_CATS;
   const pubs = netLive().filter(p=>cats.includes(p.cat));
@@ -119,13 +124,26 @@ function forecastChannels(d){
     const avail = users * OFFSITE.perUser[ch] * days/30;
     const want = budget/cpm*1000; const imps = Math.min(want, avail*.6);
     const reach = Math.min(users*.85, imps/Math.max(2.2, Math.min(d.freq.n*days*.12, 6)));
-    const ok = ch==='network' ? users>=K_ANON : users>=OFFSITE.minMatched;
+    const ok = ch==='network' ? users>=K_ANON : users>=OFFSITE.minList[ch];
     return {ch, users, avail, imps, reach, budget, cpm, ok, canDeliver: want <= avail*.6*1.02};
   });
   const pool = Math.max(cohortPool(d.audience), ...rows.map(r=>r.users));
   const union = pool * (1 - rows.reduce((a,r)=>a*(1-clamp(r.reach/pool,0,1)), 1));
   return {rows, reach: union, imps: sum(rows.map(r=>r.imps)), days};
 }
+
+/* ---------- GA4 audiences (YouTube) ---------- */
+const GA4_PROPS = [['cd','CarDekho','151299973',37],['bd','BikeDekho','346078998',22],['zw','ZigWheels','—',18]];  // [site, name, property, Torque audiences in use]
+const GA4_LIMIT = 400;
+const ga4Key = name => 'Torque | ' + String(name||'').toLowerCase().replace(/[^a-z0-9₹]+/g,'-').replace(/^-|-$/g,'');
+const GA4_READY = new Set();            // filled below: packages + saved audiences are kept warm
+const ga4State = d => { const k = ga4Key(d.audienceName); const custom = d.audienceName==='Custom audience' || d.audSrc==='custom';
+  return {key:k, ready: !custom && GA4_READY.has(k)}; };
+function ga4Card(d){ const g = ga4State(d); const sites = (d.sites?.length? d.sites : ['cd','bd','zw']).map(s=>SITES[s].name).join(' · ');
+  return `<div class="ga4row"><span class="msi" style="color:${g.ready?'var(--good, #188038)':'var(--warn, #b06000)'}">${g.ready?'check_circle':'hourglass_top'}</span>
+    <div><b style="font-weight:500">Google audience: ${esc(g.key)}</b><div class="muted" style="font-size:12.5px">${g.ready
+      ? `Ready on YouTube · GA4 audience on ${sites}, shared to Torque's Google Ads account`
+      : `Will be created in GA4 automatically when you launch (${sites}). Fills from that moment — usually ready in 24–48 h; the YouTube line starts as soon as it passes ~1,000 users.`}</div></div></div>`; }
 
 /* ---------- wizard: Channels step replaces Websites ---------- */
 WIZ[1] = 'Channels';
@@ -142,12 +160,12 @@ WIZ_STEPS[1] = d => { ensureDraftChannels(d); const has = ch => d.channels.inclu
   return `<p class="muted" style="margin:0">Run the same audience on our own sites and take it further — to YouTube, Meta and partner publishers. Your audience list is never shared with you or other advertisers; Torque runs the off-site buys in its own managed accounts.</p>
   <div class="opt-grid">${CH_ORDER.map(card).join('')}</div>
   ${has('owned')?`<div class="chcard"><h3>${msi('language','s20')} Torque sites</h3>${chips('draft.sites',Object.values(SITES).map(s=>[s.id,`${s.name} <span class="muted">· ${fmtN(s.uv)} users</span>`]),d.sites)}</div>`:''}
-  ${has('youtube')?`<div class="chcard"><h3>${msi('smart_display','s20')} YouTube formats</h3>${chips('draft.yt.formats',[['instream','In-stream'],['shorts','Shorts'],['infeed','In-feed'],['bumper','Bumper (6 s)']],d.yt.formats)}<p class="muted" style="margin:0;font-size:12.5px">Bought as a Demand Gen campaign in Torque's Google Ads account; Google places the ads across the YouTube surfaces you select.</p>${''}</div>`:''}
+  ${has('youtube')?`<div class="chcard"><h3>${msi('smart_display','s20')} YouTube formats</h3>${chips('draft.yt.formats',[['instream','In-stream'],['shorts','Shorts'],['infeed','In-feed'],['bumper','Bumper (6 s)']],d.yt.formats)}<p class="muted" style="margin:0;font-size:12.5px">${ga4Card(d)}Bought as a Demand Gen campaign in Torque's Google Ads account; Google places the ads across the YouTube surfaces you select.</p>${''}</div>`:''}
   ${has('meta')?`<div class="chcard"><h3>${msi('diversity_3','s20')} Meta placements</h3>${chips('draft.meta.platforms',[['fb','Facebook'],['ig','Instagram']],d.meta.platforms)}${chips('draft.meta.placements',[['feed','Feed'],['stories','Stories'],['reels','Reels']],d.meta.placements)}</div>`:''}
   ${has('network')?`<div class="chcard"><h3>${msi('hub','s20')} Publisher network</h3><div class="f"><span>Content categories</span>${chips('draft.net.cats',NET_CATS.map(c=>[c,`${c} <span class="muted">· ${netLive().filter(p=>p.cat===c).length}</span>`]),d.net.cats)}</div>
      <label class="chk" for="net-ex"><input id="net-ex" type="checkbox" data-bind="draft.net.exchange" data-rr="1" ${d.net.exchange?'checked':''}> Also buy the open exchange (OpenRTB) — ${EXCHANGE.sites}</label>
      <div class="row"><span class="muted" style="font-size:13px">Brand safety</span>${seg('draft.net.safety',[['strict','Strict'],['standard','Standard']],d.net.safety)}</div></div>`:''}
-  ${(has('youtube')||has('meta'))?`<div class="note">Off-site reach counts only users who <b>consented to off-site ad personalisation</b> and have a hashed ID we can match (${pct(OFFSITE.consent,0)} × ${pct(OFFSITE.identifiable,0)} of the cohort, then the platform match rate). Minimum ${fmtN(OFFSITE.minMatched)} matched users per platform.</div>`:''}`;
+  ${(has('youtube')||has('meta'))?`<div class="note">Off-site reach counts only users who <b>allowed ad personalisation</b> (${pct(OFFSITE.consent,0)} of the cohort). <b>YouTube</b> reaches them through GA4 audiences — any consented visitor Google recognises, no login needed. <b>Meta</b> needs a hashed email or phone (${pct(OFFSITE.identifiable,0)}) and its match rate. Minimum ${fmtN(OFFSITE.minList.youtube)} users on YouTube, ${fmtN(OFFSITE.minList.meta)} on Meta.</div>`:''}`;
 };
 ACT.wiz = el => { const i=+el.dataset.i; if (i<0||i>=WIZ.length) return; const d=S.draft; ensureDraftChannels(d);
   if (S.wiz===1 && i>1){ if (!d.channels.length){ toast('Choose at least one channel'); return; } if (d.channels.includes('owned') && !d.sites.length){ toast('Pick at least one Torque site, or turn Torque sites off'); return; } if (d.channels.includes('network') && !d.net.cats.length && !d.net.exchange){ toast('Pick at least one publisher category'); return; } }
@@ -221,7 +239,7 @@ VIEWS.reach = () => {
   const pool = cohortPool(src.aud);
   const rows = CH_ORDER.map(ch=>{ const users = chAudience(ch,d); const cpm = chCpm(ch,d); const imps = ch==='owned' ? forecast(Object.assign({},d,{budget:1e12})).availMonthly : users*OFFSITE.perUser[ch];
     const rate = ch==='owned'?1 : ch==='network'? users/pool : OFFSITE.match[ch];
-    const min = ch==='owned'? K_ANON : ch==='network'? K_ANON : OFFSITE.minMatched;
+    const min = ch==='owned'? K_ANON : ch==='network'? K_ANON : OFFSITE.minList[ch];
     return {ch, users, cpm, imps, rate, ok: users>=min}; });
   const opts=[...PACKAGES.map(p=>['pkg:'+p.id,p.name]),...AUDIENCES.map(a=>['aud:'+a.id,a.name])];
   return `<div class="row"><label class="f" for="rp-aud" style="min-width:300px">Audience<select id="rp-aud" data-bind="rp.aud" data-rr="1">${opts.map(([v,l])=>`<option value="${v}" ${v===S.rp.aud?'selected':''}>${esc(l)}</option>`).join('')}</select></label></div>
@@ -290,13 +308,22 @@ ACT['pub-add'] = () => { const f=S.pubForm; if (!f.name.trim()||!f.domain.trim()
 const SYNCS = [];
 (function seedSyncs(){ const r=rng('sync');
   [...AUDIENCES.slice(0,3).map(a=>[a.name,a.aud]), ...[PACKAGES[4],PACKAGES[5],PACKAGES[2]].map(p=>[p.name,p.aud])].forEach(([name,aud],i)=>{
-    ['youtube','meta'].forEach((ch,j)=>{ if ((i+j)%3===2) return; const up = cohortPool(aud)*OFFSITE.consent*OFFSITE.identifiable; const rate = OFFSITE.match[ch]*(0.9+r()*.2);
-      SYNCS.push({name, ch, uploaded:up, matched:up*rate, rate, last:`Today ${String(4+i).padStart(2,'0')}:${j?'30':'00'}`, status: up*rate<OFFSITE.minMatched?'Below minimum':'Active'}); }); }); })();
-VIEWS.activation = () => kpis([['Destinations','2','YouTube (Data Manager API), Meta (Marketing API)'],['Audiences synced',SYNCS.length,'refreshed daily'],['IDs uploaded',fmtN(sum(SYNCS.map(s=>s.uploaded))),'hashed, consented'],['Avg. match rate',pct(sum(SYNCS.map(s=>s.rate))/SYNCS.length,0),''],['Opt-outs applied (24h)','3,412','removed on next sync']])
-  + `<div class="grid g2">${['youtube','meta'].map(ch=>`<div class="chcard"><h3><span class="msi" style="color:${CH[ch].color}">${CH[ch].icon}</span>${CH[ch].name}<span style="flex:1"></span><span class="pill live">Connected</span></h3><div class="muted" style="font-size:13px">${ch==='youtube'?'Customer Match lists in the Torque Google Ads manager account. Uploaded via the Data Manager API (new Google Ads API uploads blocked since 1 Apr 2026); SHA-256 normalised email and phone.':'Custom Audiences in the Torque Business Manager. POST /{audience_id}/users via Marketing API, max 10,000 records per call, matched within ~24 h; SHA-256 normalised email and phone.'}</div><div class="row" style="font-size:13px"><span>Lists: <b style="font-weight:500">${SYNCS.filter(s=>s.ch===ch).length}</b></span><span>Matched users: <b style="font-weight:500">${fmtN(sum(SYNCS.filter(s=>s.ch===ch).map(s=>s.matched)))}</b></span><span>Refresh: daily 04:00 IST</span></div></div>`).join('')}</div>`
-  + panel('Synced audiences', `<div class="tbl-wrap"><table><thead><tr><th>Cohort</th><th>Destination</th><th class="n">Uploaded (consented)</th><th class="n">Matched</th><th class="n">Match rate</th><th>Last sync</th><th>Status</th><th></th></tr></thead><tbody>
+    GA4_READY.add(ga4Key(name));
+    ['meta'].forEach((ch,j)=>{ if ((i+j)%3===2) return; const up = cohortPool(aud)*OFFSITE.consent*OFFSITE.identifiable; const rate = OFFSITE.match[ch]*(0.9+r()*.2);
+      SYNCS.push({name, ch, uploaded:up, matched:up*rate, rate, last:`Today ${String(4+i).padStart(2,'0')}:${j?'30':'00'}`, status: up*rate<OFFSITE.minList.meta?'Below minimum':'Active'}); }); }); })();
+PACKAGES.forEach(p=>GA4_READY.add(ga4Key(p.name))); AUDIENCES.forEach(a=>GA4_READY.add(ga4Key(a.name)));
+const GA4_AUDS = (()=>{ const r=rng('ga4'); return [...GA4_READY].slice(0,9).map((k,i)=>({key:k, sites: i%3===2?'CarDekho · ZigWheels':'CarDekho · BikeDekho · ZigWheels',
+  size: i===8 ? 780 : Math.round((cohortPool(PACKAGES[i%PACKAGES.length].aud)*OFFSITE.consent*OFFSITE.googleMatch)*(0.8+r()*.4)), status: i===8?'Filling':'Ready', used: i<6? 'Live campaign' : `${3+i} days ago`})); })();
+GA4_AUDS.push({key:'Torque | car.suv.10_20l.price.30d', sites:'CarDekho · ZigWheels', size:640, status:'Filling', used:'Created today'});
+VIEWS.activation = () => kpis([['Destinations','2','YouTube (GA4 audiences), Meta (Marketing API)'],['GA4 audiences',GA4_AUDS.length,`${GA4_AUDS.filter(a=>a.status==='Ready').length} ready on YouTube`],['Meta audiences synced',SYNCS.length,'refreshed daily'],['IDs uploaded',fmtN(sum(SYNCS.map(s=>s.uploaded))),'hashed, consented'],['Avg. match rate',pct(sum(SYNCS.map(s=>s.rate))/SYNCS.length,0),''],['Opt-outs applied (24h)','3,412','removed on next sync']])
+  + `<div class="grid g2">${['youtube','meta'].map(ch=>`<div class="chcard"><h3><span class="msi" style="color:${CH[ch].color}">${CH[ch].icon}</span>${CH[ch].name}<span style="flex:1"></span><span class="pill live">Connected</span></h3><div class="muted" style="font-size:13px">${ch==='youtube'?'Cohorts are created as GA4 audiences on the CarDekho, BikeDekho and ZigWheels GA4 360 properties (Admin API) and shared to the Torque Google Ads account by the GA4 link. Nothing is uploaded; Google already sees these visits through the Google tag. Customer Match (Data Manager API) stays optional for logged-in users.':'Custom Audiences in the Torque Business Manager. POST /{audience_id}/users via Marketing API, max 10,000 records per call, matched within ~24 h; SHA-256 normalised email and phone.'}</div><div class="row" style="font-size:13px">${ch==='youtube'?`<span>Audiences: <b style="font-weight:500">${GA4_AUDS.length}</b></span><span>Status check: hourly</span><span>Archive after 60 days unused</span>`:`<span>Lists: <b style="font-weight:500">${SYNCS.length}</b></span><span>Matched users: <b style="font-weight:500">${fmtN(sum(SYNCS.map(s=>s.matched)))}</b></span><span>Refresh: daily 04:00 IST</span>`}</div></div>`).join('')}</div>`
+  + panel('GA4 audiences (YouTube)', `<div class="tbl-wrap"><table><thead><tr><th>GA4 audience</th><th>Sites</th><th class="n">Size on YouTube</th><th>Status</th><th>Last used</th></tr></thead><tbody>
+    ${GA4_AUDS.map(a=>`<tr><td class="mono" style="font-size:12.5px">${esc(a.key)}</td><td>${a.sites}</td><td class="n">${fmtN(a.size)}</td><td><span class="pill ${a.status==='Ready'?'live':'limited'}">${a.status}</span></td><td>${a.used}</td></tr>`).join('')}</tbody></table></div>
+    <div class="row" style="padding:12px 16px;font-size:13px;gap:20px">${GA4_PROPS.map(([s,n,p,u])=>`<span>${n} <span class="muted">(${p})</span>: <b style="font-weight:500">${u}</b> / ${GA4_LIMIT} audience slots</span>`).join('')}</div>`,
+    {pad:false, sub:'Created on demand when an advertiser picks a cohort; popular cohorts kept warm. Ready = visible in Google Ads and above ~1,000 users.'})
+  + panel('Synced audiences (Meta)', `<div class="tbl-wrap"><table><thead><tr><th>Cohort</th><th>Destination</th><th class="n">Uploaded (consented)</th><th class="n">Matched</th><th class="n">Match rate</th><th>Last sync</th><th>Status</th><th></th></tr></thead><tbody>
     ${SYNCS.map((s,i)=>`<tr><td><b style="font-weight:500">${esc(s.name)}</b></td><td>${chTag(s.ch)}</td><td class="n">${fmtN(s.uploaded)}</td><td class="n">${fmtN(s.matched)}</td><td class="n">${pct(s.rate,0)}</td><td>${s.last}</td><td><span class="pill ${s.status==='Active'?'live':'limited'}">${s.status}</span></td><td><button class="btn sm ghost" data-act="sync-now" data-i="${i}">Sync now</button></td></tr>`).join('')}</tbody></table></div>`, {pad:false, sub:'Lists live only in Torque-owned accounts; advertisers never receive them'})
-  + `<div class="note"><b>Rules applied on every sync:</b> only users with off-site consent · withdrawn consent removed within 24 hours · no sensitive categories · list must match ≥ ${fmtN(OFFSITE.minMatched)} users before a campaign can use it · lists deleted on the platform 30 days after last use.</div>`;
+  + `<div class="note"><b>Rules applied on every sync:</b> only users with off-site consent · withdrawn consent removed within 24 hours · no sensitive categories · Meta list must match ≥ ${fmtN(OFFSITE.minList.meta)} users and a YouTube GA4 audience ≥ ${fmtN(OFFSITE.minList.youtube)} before a campaign can use it · lists deleted on the platform 30 days after last use.</div>`;
 ACT['sync-now'] = el => { const s=SYNCS[+el.dataset.i]; const d=new Date(); s.last=`Today ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; audit('system','Governance','Synced audience',`${s.name} → ${CH[s.ch].name} · ${fmtN(s.matched)} matched`); toast(`${s.name} synced to ${CH[s.ch].name}`); render(); };
 
 /* ---------- ADMIN: extend existing pages ---------- */
@@ -316,7 +343,8 @@ VIEWS.pricing = () => _pr() + panel('Off-site and network pricing', `<div class=
 const _ar = VIEWS.arch;
 VIEWS.arch = () => _ar() + panel('Channels architecture', `<div class="tbl-wrap"><table><tbody>${[
   ['Channel router','Splits a campaign into per-channel line items and budgets; re-balances daily in Phase 2','Campaign service'],
-  ['Activation service','Builds consented, hashed ID lists per cohort; pushes to Google Data Manager API (Customer Match) and Meta Marketing API (Custom Audiences); daily refresh, opt-out purge','Worker · KMS for hashing salt'],
+  ['GA4 audience service','Turns each picked cohort into a GA4 audience on every site (find-or-create, reuse identical picks, archive unused); the GA4 → Google Ads link shares it for YouTube','GA4 Admin API (v1alpha) · Google Ads API'],
+  ['Activation service (Meta)','Builds consented, hashed ID lists per cohort; pushes to Meta Marketing API (Custom Audiences); optional Google Customer Match via Data Manager API; daily refresh, opt-out purge','Worker · KMS for hashing salt'],
   ['Off-site buyer','Creates YouTube buys as Demand Gen campaigns (classic Video campaigns are read-only in the API) and Meta campaign → ad set → ad in Torque-owned accounts','Google Ads API · Meta Marketing API'],
   ['Reporting sync','Pulls impressions, views, clicks, cost and conversions hourly into unified reporting','Google Ads API reporting · Meta Insights API'],
   ['Pixel route (optional)','Fires cohort events via Meta Pixel / Conversions API and Google tag so platforms build audiences from site visitors — larger reach, needs explicit consent','Meta CAPI · Google tag'],
@@ -330,7 +358,7 @@ const _pv = VIEWS.privacy;
 VIEWS.privacy = () => panel('Off-site activation controls', `<div class="stack"><label class="chk" for="gv-os"><input id="gv-os" type="checkbox" checked disabled> Separate consent purpose for “personalised ads on other platforms” — users can opt in to on-site cohorts but out of off-site sharing</label>
   <label class="chk" for="gv-os2"><input id="gv-os2" type="checkbox" checked disabled> Hash identifiers (SHA-256, normalised) before they leave Torque; raw email / phone never sent</label>
   <label class="chk" for="gv-os3"><input id="gv-os3" type="checkbox" checked disabled> Lists stay in Torque-owned platform accounts; never shared to advertiser accounts</label>
-  <label class="chk" for="gv-os4"><input id="gv-os4" type="checkbox" checked disabled> Minimum ${fmtN(OFFSITE.minMatched)} matched users per list · withdrawn consent purged within 24 hours</label>
+  <label class="chk" for="gv-os4"><input id="gv-os4" type="checkbox" checked disabled> Minimum ${fmtN(OFFSITE.minList.meta)} matched users per Meta list, ${fmtN(OFFSITE.minList.youtube)} per YouTube GA4 audience · withdrawn consent purged within 24 hours</label>
   <p class="muted" style="margin:0;font-size:12.5px">These need Legal / DPO sign-off and matching updates to the consent notice and platform data-processing terms before launch.</p></div>`) + _pv();
 
 /* boot again so new nav appears */
