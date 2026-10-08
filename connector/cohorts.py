@@ -1,5 +1,6 @@
 """Torque cohort catalog: the building blocks an advertiser can pick, and how each one
-is expressed as a GA4 audience on each of our sites.
+is expressed as a GA4 audience on each of our sites, using the event parameters our sites
+already send to GA4 (vehicleSegment, vehiclePrice, pageTemplates …).
 
 A cohort is  vertical · category · price band · intent · recency, e.g.
     car.suv.10_20l.price.30d   = car SUV pages, ₹10–20L models, looked at on-road price, last 30 days
@@ -7,9 +8,7 @@ A cohort is  vertical · category · price band · intent · recency, e.g.
 Fixed building blocks (instead of free-form rules) keep identical picks on one GA4 audience,
 which matters because each GA4 property can hold a limited number of audiences.
 
-SITE_RULES says how each block maps to GA4 data on each property. URL patterns are the
-fallback; once a `price_bucket` event parameter is registered as a custom dimension,
-set price_param and price bands match on it directly instead of on model lists.
+SITE_RULES says how each block maps to GA4 event parameters on each property.
 """
 import os
 
@@ -33,41 +32,55 @@ INTENTS = {   # what the visitor did, beyond viewing pages in the category
 RECENCY_DAYS = [7, 30, 90]
 
 # ---- how blocks map to GA4 on each site -------------------------------------------------
-# property ids from the GA4 360 accounts (Girnar Software Private Limited org)
+# Each rule is (event parameter, [values it CONTAINS]) — OR across the values.
+# Parameter names and values were read from the live sites' GA4 hits (Oct 2026):
+#   cardekho  : vehicleSegment="suv cars", vehiclePrice="10lakh-15lakh, 15lakh-20lakh, 20lakh-35lakh",
+#               pageTemplates="model overviewtab" | "model pricetab" | "compare resultpage", fuelType="diesel, petrol"
+#   bikedekho : vehicleSegment="scooters", vehiclePrice="80K - 1.2L", same pageTemplates/fuelType names
+#   zigwheels : body_type_new="suv cars", price_segment_new="10lakh-20lakh, 20lakh-40lakh", template_name_new
+# Values marked "confirm" follow the same pattern but weren't seen yet; check them in GA4 before relying on them.
 SITE_RULES = {
     "cardekho": {
         "property_id": os.getenv("GA4_PROP_CARDEKHO", "151299973"),
         "host": "www.cardekho.com",
-        "category_url": {"suv": ["/suv", "body-type/suv"], "sedan": ["/sedan"], "hatchback": ["/hatchback"],
-                          "muv": ["/muv"], "ev": ["/electric-cars", "/ev"], "luxury": ["/luxury"]},
-        "price_param": os.getenv("GA4_PRICE_PARAM_CARDEKHO", ""),   # e.g. price_bucket, once registered
+        "category": {"suv": ("vehicleSegment", ["suv"]), "sedan": ("vehicleSegment", ["sedan"]),
+                     "hatchback": ("vehicleSegment", ["hatchback"]), "muv": ("vehicleSegment", ["muv"]),
+                     "ev": ("fuelType", ["electric"]), "luxury": ("vehicleSegment", ["luxury"])},   # sedan..luxury: confirm
+        "price": ("vehiclePrice", {"5_10l": ["5lakh-10lakh"],                                    # confirm
+                                   "10_20l": ["10lakh-15lakh", "15lakh-20lakh"],
+                                   "20_50l": ["20lakh-35lakh", "35lakh-50lakh"]}),               # 35-50: confirm
+        "intent": ("pageTemplates", {"price": ["pricetab"], "compare": ["compare"], "reviews": ["review"]}),
     },
     "zigwheels_car": {
-        "property_id": os.getenv("GA4_PROP_ZIGWHEELS", ""),        # TODO: main ZigWheels GA4 property id
+        "property_id": os.getenv("GA4_PROP_ZIGWHEELS", ""),        # TODO: main ZigWheels GA4 property (stream G-NNM7DKZYPC)
         "host": "www.zigwheels.com",
-        "category_url": {"suv": ["/suv"], "sedan": ["/sedan"], "hatchback": ["/hatchback"], "muv": ["/muv"],
-                          "ev": ["/electric-cars"], "luxury": ["/luxury"]},
-        "price_param": os.getenv("GA4_PRICE_PARAM_ZIGWHEELS", ""),
-        "path_prefix": "/newcars",
+        "category": {"suv": ("body_type_new", ["suv"]), "sedan": ("body_type_new", ["sedan"]),
+                     "hatchback": ("body_type_new", ["hatchback"]), "muv": ("body_type_new", ["muv"]),
+                     "ev": ("fuel_type_new", ["electric"]), "luxury": ("body_type_new", ["luxury"])},
+        "price": ("price_segment_new", {"10_20l": ["10lakh-20lakh"], "20_50l": ["20lakh-40lakh"]}),
+        "intent": ("template_name_new", {"price": ["pricetab"], "compare": ["compare"], "reviews": ["review"]}),
     },
     "bikedekho": {
         "property_id": os.getenv("GA4_PROP_BIKEDEKHO", "346078998"),
         "host": "www.bikedekho.com",
-        "category_url": {"commuter": ["/commuter"], "sports": ["/sports"], "scooter": ["/scooters"],
-                          "cruiser": ["/cruiser"], "ev": ["/electric-bikes", "/electric-scooters"]},
-        "price_param": os.getenv("GA4_PRICE_PARAM_BIKEDEKHO", ""),
+        "category": {"commuter": ("vehicleSegment", ["commuter"]), "sports": ("vehicleSegment", ["sports"]),
+                     "scooter": ("vehicleSegment", ["scooter"]), "cruiser": ("vehicleSegment", ["cruiser"]),
+                     "ev": ("fuelType", ["electric"])},
+        "price": ("vehiclePrice", {"under_1l": ["80K - 1.2L"]}),   # BikeDekho buckets differ; map the rest after a GA4 check
+        "intent": ("pageTemplates", {"price": ["pricetab"], "compare": ["compare"], "reviews": ["review"]}),
     },
     "zigwheels_bike": {
         "property_id": os.getenv("GA4_PROP_ZIGWHEELS", ""),
         "host": "www.zigwheels.com",
-        "category_url": {"commuter": ["/commuter"], "sports": ["/sports"], "scooter": ["/scooters"],
-                          "cruiser": ["/cruiser"], "ev": ["/electric-bikes"]},
-        "price_param": os.getenv("GA4_PRICE_PARAM_ZIGWHEELS", ""),
-        "path_prefix": "/newbikes",
+        "category": {"commuter": ("body_type_new", ["commuter"]), "sports": ("body_type_new", ["sports"]),
+                     "scooter": ("body_type_new", ["scooter"]), "cruiser": ("body_type_new", ["cruiser"]),
+                     "ev": ("fuel_type_new", ["electric"])},
+        "price": ("price_segment_new", {}),
+        "intent": ("template_name_new", {"price": ["pricetab"], "compare": ["compare"], "reviews": ["review"]}),
     },
 }
 
-# Until a price parameter exists in GA4, a price band = "viewed one of these models".
+# Fallback only: if a site has no price parameter for a band, a band = "viewed one of these models".
 # Kept short (GA4 limits filter size); refresh from the Torque model catalog.
 MODELS_BY_BAND = {
     ("suv", "10_20l"): ["hyundai/creta", "kia/seltos", "maruti/grand-vitara", "toyota/hyryder", "tata/harrier",

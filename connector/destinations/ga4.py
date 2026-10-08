@@ -42,42 +42,49 @@ def _or(exprs):
     return {"orGroup": {"filterExpressions": exprs}}
 
 
-def _page_view_any(urls, rules):
-    """page_view whose URL contains any of the patterns (an OR inside one event filter)."""
-    prefix = rules.get("path_prefix", "")
-    patterns = [u if u.startswith(prefix) or not u.startswith("/") else prefix + u for u in urls]
-    return {"eventFilter": {"eventName": "page_view", "eventParameterFilterExpression": {
-        "andGroup": {"filterExpressions": [_or([_str("page_location", p) for p in patterns])]}}}}
+def _param_any(param, values, event="page_view"):
+    """An event whose parameter CONTAINS any of the values, e.g. vehicleSegment contains "suv"."""
+    return {"eventFilter": {"eventName": event, "eventParameterFilterExpression": {
+        "andGroup": {"filterExpressions": [_or([_str(param, v) for v in values])]}}}}
+
+
+def _models_any(models):
+    return _param_any("page_location", ["/" + m for m in models])
 
 
 def build_audience(cohort_key: str, site: str) -> dict:
     """GA4 Audience resource for one cohort on one site.
 
-    Shape required by the API: filterExpression = andGroup → orGroup → (event / dimension filter).
-    Each orGroup below is one condition that must hold (category, price band, intent).
+    Category, price band and page intent are matched on the SAME page_view (one event filter whose
+    parameter conditions are ANDed), so "SUV · ₹10–20L · price intent" means a visitor opened the price
+    page of a ₹10–20L SUV, not three unrelated pages. Lead intent is a separate event condition.
+    Shape required by the API: andGroup → orGroup → event filter (→ andGroup → orGroup → parameter filter).
     """
     c = cohorts.parse(cohort_key)
     rules = cohorts.SITE_RULES[site]
-    category = _or([_page_view_any(rules["category_url"][c["category"]], rules)])
-    conditions = [category]
+    param, values = rules["category"][c["category"]]
+    page = [_or([_str(param, v) for v in values])]            # parameter conditions on one page_view
 
     if c["band"] != "any":
-        if rules.get("price_param"):
-            conditions.append(_or([{"eventFilter": {"eventName": "page_view", "eventParameterFilterExpression": {
-                "andGroup": {"filterExpressions": [_or([_str(rules["price_param"], c["band"], "EXACT")])]}}}}]))
+        price_param, bands = rules["price"]
+        if bands.get(c["band"]):
+            page.append(_or([_str(price_param, v) for v in bands[c["band"]]]))
+        elif cohorts.MODELS_BY_BAND.get((c["category"], c["band"])):
+            page = [_or([_str("page_location", "/" + m) for m in cohorts.MODELS_BY_BAND[(c["category"], c["band"])]])]
         else:
-            models = cohorts.MODELS_BY_BAND.get((c["category"], c["band"]))
-            if not models:
-                raise ValueError(f"No price data for {cohort_key} on {site}: register a price parameter in GA4 "
-                                 f"or add MODELS_BY_BAND[({c['category']!r}, {c['band']!r})]")
-            # the model pages already imply the category, so they replace the category condition
-            conditions = [_or([_page_view_any(["/" + m for m in models], rules)])]
+            raise ValueError(f"No GA4 mapping for price band {c['band']} on {site}: add it to SITE_RULES['{site}']['price']")
 
-    intent = cohorts.INTENTS[c["intent"]]
-    if intent and "url" in intent:
-        conditions.append(_or([_page_view_any(intent["url"], rules)]))
-    if intent and "event" in intent:
-        conditions.append(_or([{"eventFilter": {"eventName": e}} for e in intent["event"]]))
+    lead = None
+    if c["intent"] == "lead":
+        lead = _or([{"eventFilter": {"eventName": e}} for e in cohorts.INTENTS["lead"]["event"]])
+    elif c["intent"] != "any":
+        iparam, imap = rules["intent"]
+        page.append(_or([_str(iparam, v) for v in imap[c["intent"]]]))
+
+    conditions = [_or([{"eventFilter": {"eventName": "page_view",
+                                        "eventParameterFilterExpression": {"andGroup": {"filterExpressions": page}}}}])]
+    if lead:
+        conditions.append(lead)
 
     return {
         "displayName": display_name(cohort_key),
