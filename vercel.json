@@ -1,27 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "",
-  "buildCommand": "",
-  "outputDirectory": "public",
-  "cleanUrls": true,
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, nofollow"
-        },
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        }
-      ]
-    }
-  ]
+  "installCommand": "echo no install",
+  "buildCommand": "rm -rf .vercel/output && mkdir -p .vercel/output/static && cp public/index.html .vercel/output/static/index.html && cp deploy/config.json .vercel/output/config.json && echo 'static site ready'"
 }
