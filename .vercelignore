@@ -1,0 +1,9 @@
+# Only the built prototype is served. Code, connector and docs stay in GitHub, not on the website.
+connector/
+src/
+*.py
+*.command
+*.md
+*.db
+*.db-journal
+.git*
