@@ -27,6 +27,7 @@ const sectionOf = v => railFor().find(s=>flatItems(s).some(i=>i[0]===v)) || rail
 const msi = (n, cls='') => `<span class="msi ${cls}" aria-hidden="true">${n}</span>`;
 
 function bannerHTML(){
+  return '';   // alert stripe removed from all consoles (decluttered header)
   const key = S.console+':'+S.advId; if (S.bannerOff[key]) return '';
   if (S.console==='pub') return typeof pubBannerHTML==='function' ? pubBannerHTML() : '';
   if (S.console==='adm') return `<div class="banner" role="status">${msi('warning')}<p><b>Advertiser verification pending</b> — Crestline Tyres can't launch campaigns until GST and brand-safety review are complete.</p><button class="linkbtn" data-act="dismiss">Dismiss</button><button class="linkbtn" data-act="go" data-v="privacy">Learn more ${msi('open_in_new','s18')}</button><button class="btn fix" data-act="go" data-v="advertisers">Fix it</button></div>`;

@@ -85,6 +85,7 @@ button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
 .pop input{margin:4px 12px 8px;width:calc(100% - 24px)}
 
 /* banner */
+#banner:empty{display:none}
 .banner{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:10px 16px 10px 20px;margin:0 20px 8px;flex-wrap:wrap}
 .banner>.msi{color:var(--warn)}
 .banner p{margin:0;flex:1;min-width:260px;font-size:14px;color:var(--ink)}
@@ -904,6 +905,7 @@ const sectionOf = v => railFor().find(s=>flatItems(s).some(i=>i[0]===v)) || rail
 const msi = (n, cls='') => `<span class="msi ${cls}" aria-hidden="true">${n}</span>`;
 
 function bannerHTML(){
+  return '';   // alert stripe removed from all consoles (decluttered header)
   const key = S.console+':'+S.advId; if (S.bannerOff[key]) return '';
   if (S.console==='pub') return typeof pubBannerHTML==='function' ? pubBannerHTML() : '';
   if (S.console==='adm') return `<div class="banner" role="status">${msi('warning')}<p><b>Advertiser verification pending</b> — Crestline Tyres can't launch campaigns until GST and brand-safety review are complete.</p><button class="linkbtn" data-act="dismiss">Dismiss</button><button class="linkbtn" data-act="go" data-v="privacy">Learn more ${msi('open_in_new','s18')}</button><button class="btn fix" data-act="go" data-v="advertisers">Fix it</button></div>`;
