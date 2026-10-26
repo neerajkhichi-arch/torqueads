@@ -3,14 +3,8 @@
   "framework": null,
   "installCommand": "",
   "buildCommand": "",
-  "outputDirectory": ".",
+  "outputDirectory": "public",
   "cleanUrls": true,
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/torque_prototype.html"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
